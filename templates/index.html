@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CSV EDA Tool</title>
+</head>
+
+<body>
+
+<h1>CSV EDA Tool</h1>
+
+<form method="POST" enctype="multipart/form-data">
+    <input type="file" name="file">
+    <button type="submit">Upload CSV</button>
+</form>
+
+{% if preview %}
+
+<h2>Dataset Preview</h2>
+{{ preview | safe }}
+
+<h2>Dataset Info</h2>
+<p>Rows: {{ rows }}</p>
+<p>Columns: {{ cols }}</p>
+
+<h2>Missing Values</h2>
+<ul>
+{% for column, value in missing.items() %}
+<li>{{ column }} : {{ value }}</li>
+{% endfor %}
+</ul>
+
+{% endif %}
+
+</body>
+</html>
