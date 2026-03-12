@@ -3,8 +3,12 @@ import pandas as pd
 
 app = Flask(__name__)
 
-@app.route("/", methods=["GET", "POST"])
+df = None
+
+@app.route("/", methods=["GET","POST"])
 def index():
+
+    global df
 
     preview = None
     rows = None
@@ -13,16 +17,39 @@ def index():
 
     if request.method == "POST":
 
-        file = request.files["file"]
+        # CSV upload
+        if "file" in request.files:
 
-        if file:
-            df = pd.read_csv(file)
+            file = request.files["file"]
 
-            preview = df.head().to_html()
+            if file.filename != "":
+                df = pd.read_csv(file)
 
-            rows, cols = df.shape
+        # Missing value cleaning
+        if "column" in request.form and df is not None:
 
-            missing = df.isnull().sum().to_dict()
+            column = request.form["column"]
+            method = request.form["method"]
+
+            if method == "unknown":
+                df[column] = df[column].fillna("Unknown")
+
+            elif method == "mean":
+                df[column] = df[column].fillna(df[column].mean())
+
+            elif method == "median":
+                df[column] = df[column].fillna(df[column].median())
+
+            elif method == "drop":
+                df.dropna(subset=[column], inplace=True)
+
+    if df is not None:
+
+        preview = df.head().to_html()
+
+        rows, cols = df.shape
+
+        missing = df.isnull().sum().to_dict()
 
     return render_template(
         "index.html",
@@ -31,6 +58,7 @@ def index():
         cols=cols,
         missing=missing
     )
+
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -22,7 +22,31 @@
 <p>Rows: {{ rows }}</p>
 <p>Columns: {{ cols }}</p>
 
-<h2>Missing Values</h2>
+<h2>Clean Missing Values</h2>
+
+<form method="POST">
+
+<label>Select Column:</label>
+
+<select name="column">
+{% for column in missing.keys() %}
+<option value="{{ column }}">{{ column }}</option>
+{% endfor %}
+</select>
+
+<label>Method:</label>
+
+<select name="method">
+<option value="unknown">Fill with "Unknown"</option>
+<option value="mean">Fill with Mean</option>
+<option value="median">Fill with Median</option>
+<option value="drop">Drop Rows</option>
+</select>
+
+<button type="submit">Apply Cleaning</button>
+
+</form>
+
 <ul>
 {% for column, value in missing.items() %}
 <li>{{ column }} : {{ value }}</li>
