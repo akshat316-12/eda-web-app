@@ -5,7 +5,7 @@ import seaborn as sns
 PLOT_PATH = "static/plots/manual_plot.png"
 
 
-def generate_plot(df: pd.DataFrame, form: dict) -> tuple[str | None, str | None]:
+def generate_plot(df: pd.DataFrame, form: dict, plot_path: str = PLOT_PATH) -> tuple[str | None, str | None]:
     """
     Builds and saves a plot based on form inputs.
     Returns (plot_path, group_preview_html).
@@ -40,10 +40,10 @@ def generate_plot(df: pd.DataFrame, form: dict) -> tuple[str | None, str | None]
         group_preview = _plot_grouped(df, graph_type, group_col, value_col, agg_method)
 
     plt.tight_layout()
-    plt.savefig(PLOT_PATH)
+    plt.savefig(plot_path)
     plt.close()
 
-    return PLOT_PATH, group_preview
+    return plot_path, group_preview
 
 
 # ── private helpers ────────────────────────────────────────────────────────────

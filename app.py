@@ -1,21 +1,43 @@
-from flask import Flask, render_template, request, send_file
 import io
+import os
+import uuid
+
+import pandas as pd
+from flask import Flask, render_template, request, send_file, session
 
 from utils.data_cleaning import load_csv, clean_column, get_summary
 from utils.visualization import generate_plot
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
 
-df        = None
-plot_path = None
+# In-memory store: { session_id: dataframe }
+USER_DATA: dict[str, pd.DataFrame] = {}
+
+
+def get_df() -> pd.DataFrame | None:
+    return USER_DATA.get(session.get("uid"))
+
+
+def set_df(df: pd.DataFrame):
+    if "uid" not in session:
+        session["uid"] = str(uuid.uuid4())
+    USER_DATA[session["uid"]] = df
+
+
+def get_plot_path() -> str:
+    """Each user gets their own plot file so charts don't overwrite each other."""
+    if "uid" not in session:
+        session["uid"] = str(uuid.uuid4())
+    return f"static/plots/plot_{session['uid']}.png"
 
 
 @app.route("/", methods=["GET", "POST"])
 def index():
 
-    global df, plot_path
-
     group_preview = None
+    plot_path     = None
+    df            = get_df()
 
     if request.method == "POST":
 
@@ -24,6 +46,7 @@ def index():
             file = request.files["file"]
             if file.filename.endswith(".csv"):
                 df = load_csv(file)
+                set_df(df)
 
         # ── Clean missing values ───────────────────────────────────────────────
         if "clean_column" in request.form and df is not None:
@@ -32,12 +55,14 @@ def index():
                 column=request.form["clean_column"],
                 method=request.form["method"],
             )
+            set_df(df)
 
         # ── Generate chart ─────────────────────────────────────────────────────
         if "graph_type" in request.form and df is not None:
-            plot_path, group_preview = generate_plot(df, request.form)
+            plot_path, group_preview = generate_plot(df, request.form, get_plot_path())
 
     # ── Build template context ─────────────────────────────────────────────────
+    df      = get_df()
     summary = get_summary(df) if df is not None else {}
 
     return render_template(
@@ -59,7 +84,7 @@ def index():
 @app.route("/download_csv")
 def download_csv():
 
-    global df
+    df = get_df()
 
     if df is None:
         return "No dataset loaded", 400
