@@ -1,59 +1,387 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>CSV EDA Tool</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EDA Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-
 <body>
 
-<h1>CSV EDA Tool</h1>
+<!-- ════════════ SIDEBAR ════════════ -->
+<div class="sidebar">
 
-<form method="POST" enctype="multipart/form-data">
-    <input type="file" name="file">
-    <button type="submit">Upload CSV</button>
-</form>
+  <div class="sidebar-logo">
+    <div class="logo-badge">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 3h7v7H3zm11 0h7v7h-7zm0 11h7v7h-7zM3 14l3.5-6L10 14z"/>
+        </svg>
+      </div>
+      EDA Studio
+    </div>
+  </div>
 
-{% if preview %}
+  <!-- Upload -->
+  <div class="sidebar-section">
+    <div class="section-label">Dataset</div>
+    <form method="POST" enctype="multipart/form-data" id="uploadForm">
+      <label for="fileInput" class="upload-zone" id="dropZone">
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+          </svg>
+        </div>
+        <div class="upload-text">
+          <strong>Click to upload</strong> or drag &amp; drop<br>CSV files only
+        </div>
+        <input type="file" name="file" id="fileInput" accept=".csv"
+               onchange="document.getElementById('uploadForm').submit()">
+      </label>
+    </form>
+  </div>
 
-<h2>Dataset Preview</h2>
-{{ preview | safe }}
+  <!-- Clean Missing Values -->
+  <div class="sidebar-section">
+    <div class="section-label">Handle Missing Values</div>
+    <form method="POST" id="cleanForm">
+      <div class="field-group">
+        <div class="field-label">Column</div>
+        <select name="clean_column">
+          {% for col in missing_cols %}
+          <option value="{{ col }}">{{ col }}</option>
+          {% endfor %}
+        </select>
+      </div>
 
-<h2>Dataset Info</h2>
-<p>Rows: {{ rows }}</p>
-<p>Columns: {{ cols }}</p>
+      <div class="field-group">
+        <div class="field-label">Strategy</div>
+        <select name="method">
+          <option value="mean">Mean</option>
+          <option value="median">Median</option>
+          <option value="mode">Mode</option>
+          <option value="zero">Fill with 0</option>
+          <option value="unknown">Fill "Unknown"</option>
+          <option value="drop">Drop rows</option>
+        </select>
+      </div>
 
-<h2>Clean Missing Values</h2>
+      <button type="submit" class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+        </svg>
+        Apply Cleaning
+      </button>
+    </form>
+  </div>
 
-<form method="POST">
+  <!-- Graph Generator -->
+  <div class="sidebar-section">
+    <div class="section-label">Visualize</div>
+    <form method="POST" id="graphForm">
 
-<label>Select Column:</label>
+      <div class="field-label" style="margin-bottom:8px;">Chart type</div>
+      <div class="graph-grid">
+        <label class="graph-chip" onclick="setGraph('hist', this)">
+          <span class="chip-icon">📊</span> Histogram
+          <input type="radio" name="graph_type" value="hist" style="display:none">
+        </label>
+        <label class="graph-chip" onclick="setGraph('scatter', this)">
+          <span class="chip-icon">⬤</span> Scatter
+          <input type="radio" name="graph_type" value="scatter" style="display:none">
+        </label>
+        <label class="graph-chip" onclick="setGraph('box', this)">
+          <span class="chip-icon">▭</span> Box Plot
+          <input type="radio" name="graph_type" value="box" style="display:none">
+        </label>
+        <label class="graph-chip" onclick="setGraph('bar', this)">
+          <span class="chip-icon">▬</span> Bar
+          <input type="radio" name="graph_type" value="bar" style="display:none">
+        </label>
+        <label class="graph-chip" onclick="setGraph('line', this)">
+          <span class="chip-icon">〜</span> Line
+          <input type="radio" name="graph_type" value="line" style="display:none">
+        </label>
+        <label class="graph-chip" onclick="setGraph('pie', this)">
+          <span class="chip-icon">◑</span> Pie
+          <input type="radio" name="graph_type" value="pie" style="display:none">
+        </label>
+        <label class="graph-chip" onclick="setGraph('heatmap', this)" style="grid-column: span 2;">
+          <span class="chip-icon">🟦</span> Heatmap
+          <input type="radio" name="graph_type" value="heatmap" style="display:none">
+        </label>
+      </div>
 
-<select name="column">
-{% for column in missing.keys() %}
-<option value="{{ column }}">{{ column }}</option>
-{% endfor %}
-</select>
+      <!-- Single axis: hist, box, pie -->
+      <div id="xAxisDiv" style="display:none;" class="field-group">
+        <div class="field-label">Column</div>
+        <select name="column" id="xColumn"></select>
+      </div>
 
-<label>Method:</label>
+      <!-- Dual axis: scatter -->
+      <div id="scatterDiv" style="display:none;">
+        <div class="axis-row visible" style="gap:10px;">
+          <div class="axis-col">
+            <div class="field-label">X Axis</div>
+            <select name="column" id="xColumnScatter"></select>
+          </div>
+          <div class="axis-col">
+            <div class="field-label">Y Axis</div>
+            <select name="column2" id="yColumn"></select>
+          </div>
+        </div>
+      </div>
 
-<select name="method">
-<option value="unknown">Fill with "Unknown"</option>
-<option value="mean">Fill with Mean</option>
-<option value="median">Fill with Median</option>
-<option value="drop">Drop Rows</option>
-</select>
+      <!-- Grouped: bar, line -->
+      <div id="groupDiv" style="display:none;">
+        <div class="field-group">
+          <div class="field-label">Group by</div>
+          <select name="group_col">
+            {% for col in columns %}
+            <option value="{{ col }}">{{ col }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Value column</div>
+          <select name="value_col">
+            {% for col in numeric_cols %}
+            <option value="{{ col }}">{{ col }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Aggregation</div>
+          <select name="agg_method">
+            <option value="mean">Mean</option>
+            <option value="sum">Sum</option>
+            <option value="count">Count</option>
+            <option value="median">Median</option>
+          </select>
+        </div>
+      </div>
 
-<button type="submit">Apply Cleaning</button>
+      <button type="submit" class="btn btn-primary" style="margin-top:8px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path stroke-linecap="round" d="M12 2v2m0 16v2M2 12h2m16 0h2m-3.5-7.5-1.4 1.4M6.9 17.1l-1.4 1.4m0-12.8 1.4 1.4m10.2 10.2 1.4 1.4"/>
+        </svg>
+        Generate Chart
+      </button>
 
-</form>
+    </form>
+  </div>
 
-<ul>
-{% for column, value in missing.items() %}
-<li>{{ column }} : {{ value }}</li>
-{% endfor %}
-</ul>
+</div>
 
-{% endif %}
+<!-- ════════════ MAIN ════════════ -->
+<div class="main">
+
+  {% if preview %}
+
+  <div class="page-header">
+    <div class="page-title">Dataset Overview</div>
+    <div class="page-subtitle">Loaded and ready for exploration</div>
+  </div>
+
+  <!-- Stat Cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value">{{ rows }}</div>
+      <div class="stat-label">Rows</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{ cols }}</div>
+      <div class="stat-label">Columns</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{ missing_cols | length }}</div>
+      <div class="stat-label">Cols w/ NaN</div>
+    </div>
+  </div>
+
+  <!-- Download Bar -->
+  <div class="action-bar">
+    <div class="action-bar-text">Export the <strong>cleaned dataset</strong> as CSV</div>
+    <a href="/download_csv" class="btn-download">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+      </svg>
+      Download CSV
+    </a>
+  </div>
+
+  <!-- Data Preview -->
+  <div class="section-header">
+    <div class="section-title">Data Preview</div>
+  </div>
+  <div class="table-wrap" style="margin-bottom:28px;">
+    {{ preview | safe }}
+  </div>
+
+  <!-- Column Profile -->
+  <div class="section-header">
+    <div class="section-title">Column Profile</div>
+  </div>
+  <div class="table-wrap">
+    <table class="profile-table">
+      <thead>
+        <tr>
+          <th>Column</th>
+          <th>Type</th>
+          <th>Missing</th>
+          <th>Unique</th>
+          <th>Mean</th>
+          <th>Min</th>
+          <th>Max</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for col in profile %}
+        <tr>
+          <td style="font-weight:500; color:var(--text);">{{ col.column }}</td>
+          <td>
+            <span class="badge badge-{{ col.type }}">{{ col.type }}</span>
+          </td>
+          <td>
+            <div class="missing-bar-wrap">
+              {% set pct = (col.missing / rows * 100) | int %}
+              <div class="missing-bar-bg">
+                <div class="missing-bar-fill {% if pct > 40 %}high{% elif pct > 15 %}mid{% endif %}"
+                     style="width:{{ pct }}%;"></div>
+              </div>
+              <span class="missing-pct">{{ col.missing }}</span>
+            </div>
+          </td>
+          <td style="font-family:var(--mono);">{{ col.unique }}</td>
+          <td style="font-family:var(--mono); color:var(--text2);">{{ col.mean }}</td>
+          <td style="font-family:var(--mono); color:var(--text2);">{{ col.min }}</td>
+          <td style="font-family:var(--mono); color:var(--text2);">{{ col.max }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Grouped Data Preview -->
+  {% if group_preview %}
+  <div class="grouped-preview">
+    <div class="section-header" style="margin-top:28px;">
+      <div class="section-title">Grouped Data</div>
+    </div>
+    <div class="table-wrap">
+      {{ group_preview | safe }}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Generated Chart -->
+  {% if plot_path %}
+  <div class="graph-card">
+    <div class="section-header">
+      <div class="section-title">Generated Chart</div>
+      <a href="{{ plot_path }}" download="chart.png" class="btn-download" style="width:auto;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/>
+        </svg>
+        Save Chart
+      </a>
+    </div>
+    <img src="{{ plot_path }}" alt="Generated chart">
+  </div>
+  {% endif %}
+
+  {% else %}
+
+  <!-- Empty State -->
+  <div class="empty-state">
+    <div class="empty-icon">
+      <svg viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+      </svg>
+    </div>
+    <div class="empty-title">No dataset loaded</div>
+    <div class="empty-desc">Upload a CSV file from the sidebar to start exploring your data with charts, statistics, and cleaning tools.</div>
+  </div>
+
+  {% endif %}
+
+</div>
+
+<script>
+  const numericCols = {{ numeric_cols | tojson | safe }};
+  const catCols     = {{ cat_cols | tojson | safe }};
+  const allCols     = {{ columns | list | tojson | safe }};
+
+  function fillDropdown(el, cols) {
+    el.innerHTML = '';
+    cols.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c;
+      o.text  = c;
+      el.appendChild(o);
+    });
+  }
+
+  function setGraph(type, el) {
+    document.querySelectorAll('.graph-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    el.querySelector('input[type=radio]').checked = true;
+
+    const xDiv  = document.getElementById('xAxisDiv');
+    const scDiv = document.getElementById('scatterDiv');
+    const grDiv = document.getElementById('groupDiv');
+
+    xDiv.style.display  = 'none';
+    scDiv.style.display = 'none';
+    grDiv.style.display = 'none';
+
+    if (type === 'hist' || type === 'box') {
+      xDiv.style.display = 'block';
+      fillDropdown(document.getElementById('xColumn'), numericCols);
+    } else if (type === 'pie') {
+      xDiv.style.display = 'block';
+      fillDropdown(document.getElementById('xColumn'), catCols);
+    } else if (type === 'scatter') {
+      scDiv.style.display = 'block';
+      fillDropdown(document.getElementById('xColumnScatter'), numericCols);
+      fillDropdown(document.getElementById('yColumn'), numericCols);
+    } else if (type === 'bar' || type === 'line') {
+      grDiv.style.display = 'block';
+    }
+  }
+
+  // Drag & drop upload
+  const dropZone = document.getElementById('dropZone');
+
+  ['dragenter', 'dragover'].forEach(evt => {
+    dropZone.addEventListener(evt, ev => {
+      ev.preventDefault();
+      dropZone.style.borderColor = 'var(--accent)';
+      dropZone.style.background  = 'rgba(108,143,255,0.07)';
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(evt => {
+    dropZone.addEventListener(evt, ev => {
+      ev.preventDefault();
+      dropZone.style.borderColor = '';
+      dropZone.style.background  = '';
+    });
+  });
+
+  dropZone.addEventListener('drop', ev => {
+    const file = ev.dataTransfer.files[0];
+    if (file) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      document.getElementById('fileInput').files = dt.files;
+      document.getElementById('uploadForm').submit();
+    }
+  });
+</script>
 
 </body>
 </html>
