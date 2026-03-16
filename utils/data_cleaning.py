@@ -7,23 +7,27 @@ def load_csv(file) -> pd.DataFrame:
 
 def clean_column(df: pd.DataFrame, column: str, method: str) -> pd.DataFrame:
 
+    df = df.copy()  # avoid mutating the original
+
     if method == "unknown":
-        df[column].fillna("Unknown", inplace=True)
+        df[column] = df[column].fillna("Unknown")
 
     elif method == "zero":
-        df[column].fillna(0, inplace=True)
+        df[column] = df[column].fillna(0)
 
     elif method == "mean" and pd.api.types.is_numeric_dtype(df[column]):
-        df[column].fillna(df[column].mean(), inplace=True)
+        val = df[column].mean()
+        df[column] = df[column].fillna(round(val) if column.lower() == "age" else val)
 
     elif method == "median" and pd.api.types.is_numeric_dtype(df[column]):
-        df[column].fillna(df[column].median(), inplace=True)
+        val = df[column].median()
+        df[column] = df[column].fillna(round(val) if column.lower() == "age" else val)
 
     elif method == "mode":
-        df[column].fillna(df[column].mode()[0], inplace=True)
+        df[column] = df[column].fillna(df[column].mode()[0])
 
     elif method == "drop":
-        df.dropna(subset=[column], inplace=True)
+        df = df.dropna(subset=[column])
 
     return df
 

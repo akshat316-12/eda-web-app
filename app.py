@@ -49,7 +49,7 @@ def index():
                 set_df(df)
 
         # ── Clean missing values ───────────────────────────────────────────────
-        if "clean_column" in request.form and df is not None:
+        if request.form.get("action") == "clean" and df is not None:
             df = clean_column(
                 df,
                 column=request.form["clean_column"],
